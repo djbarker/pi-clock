@@ -14,7 +14,7 @@ from gpiozero import Button
 from signal import pause
 
 
-from font import chars
+from font_v2 import chars
 
 # To turn off the status LED do the following in bash:
 #
