@@ -18,6 +18,7 @@ from screen import Screen
 from anims import Animation
 from anims.time import TimeAnim, is_daytime, get_next_time_of_day
 from anims.splat import ChangingSplatAnim
+from anims.tube import TubeStatusAnim
 
 # To turn off the status LED do the following in bash:
 #
@@ -109,14 +110,12 @@ class MainLoop:
 
         # set up the animations
 
+        w, h = self.screen.width, self.screen.height
+
         self.anims = {
-            "time": TimeAnim(
-                self.screen.width,
-                self.screen.height,
-                MainLoop.DAYTIME,
-                MainLoop.NIGHTTIME,
-            ),
-            "splat": ChangingSplatAnim(self.screen.width, self.screen.height, "matrix"),
+            "time": TimeAnim(w, h, MainLoop.DAYTIME, MainLoop.NIGHTTIME),
+            "tube": TubeStatusAnim(w, h),
+            "splat": ChangingSplatAnim(w, h, "matrix"),
         }
 
         self.anim_idx = 0  # start with time
