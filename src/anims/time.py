@@ -13,6 +13,7 @@ __all__ = [
     "is_daytime",
     "is_nighttime",
     "get_next_time_of_day",
+    "get_prev_time_of_day",
     "TimeAnim",
 ]
 
@@ -55,6 +56,17 @@ def get_next_time_of_day(
         return datetime.datetime.combine(tomorrow, time_of_day)
 
 
+def get_prev_time_of_day(
+    timestamp: datetime.datetime, time_of_day: datetime.time
+) -> datetime.date:
+    if timestamp.time() >= time_of_day:
+        today = timestamp.date()
+        return datetime.datetime.combine(today, time_of_day)
+    else:
+        tomorrow = (timestamp - datetime.timedelta(days=1)).date()
+        return datetime.datetime.combine(tomorrow, time_of_day)
+
+
 class TimeAnim(Animation):
 
     def __init__(
@@ -82,8 +94,9 @@ class TimeAnim(Animation):
         r, g, b = 0, 0, 0
 
         if is_daytime(time, self.daytime, self.nighttime):
-            h = np.fmod(time.timestamp(), 300.0) / 300.0
-            r, g, b = np.array(hsv_to_rgb(h, 0.8, 1.0)) * 200
+            hue_freq = 200.0
+            h = np.fmod(time.timestamp(), hue_freq) / hue_freq
+            r, g, b = np.array(hsv_to_rgb(h, 0.8, 1.0)) * 150
         else:
             r, g, b = np.array(COLOR_MAP[self.color])
             r *= MIN_BRIGHTNESS_R

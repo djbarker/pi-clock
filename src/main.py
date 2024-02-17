@@ -16,7 +16,7 @@ from signal import pause
 
 from screen import Screen
 from anims import Animation
-from anims.time import TimeAnim, is_daytime, get_next_time_of_day
+from anims.time import TimeAnim, is_daytime, get_prev_time_of_day, get_next_time_of_day
 from anims.splat import ChangingSplatAnim
 from anims.tube import TubeStatusAnim
 
@@ -78,8 +78,8 @@ class MainLoop:
     Handles transitioning between animations and telling the current animation to handle the button presses.
     """
 
-    DAYTIME = datetime.time(8, 30)
-    NIGHTTIME = datetime.time(22, 30)
+    DAYTIME = datetime.time(8, 0)
+    NIGHTTIME = datetime.time(22, 0)
 
     ANIM_PERIOD = datetime.timedelta(seconds=45)
 
@@ -134,19 +134,39 @@ class MainLoop:
                 )
 
         def _on_daytime(time: datetime.datetime):
-            self.screen.set_brightness(0.3)
             self.cycle_anim(time)
+
+            # initially increase brightness a bit, then fully later, then decrease again
+            self.screen.set_brightness(0.1)
+            self.schedule(
+                get_next_time_of_day(time, datetime.time(9, 0)),
+                lambda _t: self.screen.set_brightness(0.3),
+            )
+
+            self.schedule(
+                get_next_time_of_day(time, datetime.time(21, 0)),
+                lambda _t: self.screen.set_brightness(0.2),
+            )
 
             # schedule tomorrow's daytime
             self.schedule(get_next_time_of_day(time, self.NIGHTTIME), _on_nighttime)
 
         def _on_nighttime(time: datetime.datetime):
-            self.screen.set_brightness(0.05)
             self.cycle_anim(time, "time")
+
+            # initially decrease brightness a bit, then fully later.
+            self.screen.set_brightness(0.1)
+            self.schedule(
+                get_next_time_of_day(time, datetime.time(23, 0)),
+                lambda _t: self.screen.set_brightness(0.05),
+            )
 
             # schedule tomorrow's nighttime
             self.schedule(get_next_time_of_day(time, self.NIGHTTIME), _on_nighttime)
 
+        # we also schedule for prev day-/nighttime so that we cycle through and get the right brightness for right now
+        self.schedule(get_prev_time_of_day(now, self.DAYTIME), _on_daytime)
+        self.schedule(get_prev_time_of_day(now, self.NIGHTTIME), _on_nighttime)
         self.schedule(get_next_time_of_day(now, self.DAYTIME), _on_daytime)
         self.schedule(get_next_time_of_day(now, self.NIGHTTIME), _on_nighttime)
 
