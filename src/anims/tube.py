@@ -109,8 +109,8 @@ class TubeStatusAnim(Animation):
         off_x = 0
         off_y = 0
         for line, status in zip(self.lines, self.statuses):
-            col_l = np.array(LINE_COLORS[line]) * 0.7
-            col_s = status.color
+            col_l = np.array(LINE_COLORS[line]) * 0.5
+            col_s = status.color * 0.7
 
             # blink degraded service statuses
             if not status.is_good_service and (time.second % 2 == 0):

@@ -96,7 +96,7 @@ class TimeAnim(Animation):
         if is_daytime(time, self.daytime, self.nighttime):
             hue_freq = 200.0
             h = np.fmod(time.timestamp(), hue_freq) / hue_freq
-            r, g, b = np.array(hsv_to_rgb(h, 0.8, 1.0)) * 150
+            r, g, b = np.array(hsv_to_rgb(h, 0.8, 1.0)) * 100
         else:
             r, g, b = np.array(COLOR_MAP[self.color])
             r *= MIN_BRIGHTNESS_R
