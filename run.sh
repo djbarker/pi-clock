@@ -14,6 +14,9 @@ workon main
 
 sleep 5
 
+# uncomment to enable verbose logging
+# export LOG_LEVEL=DEBUG
+
 # run it
 nohup python src/main.py -b 0.05 -f &
 
