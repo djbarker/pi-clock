@@ -2,6 +2,7 @@ import argparse as ap
 import datetime
 import logging
 import numpy as np
+import os
 import queue
 import time
 import sys
@@ -28,35 +29,16 @@ from anims.tube import TubeStatusAnim
 
 log = logging.getLogger(__name__)
 
-
-class Transition:
-
-    def __init__(self, w, h, anim1, anim2):
-        self.anim1 = anim1
-        self.anim2 = anim2
-        self.x = 0
-        self.w = w
-
-        self.img_rgb = np.zeros((w, h, 3))
-
-    def step(self, t: float) -> np.ndarray:
-        img_1 = self.anim1.step(t)
-        img_2 = self.anim2.step(t)
-
-        self.img_rgb[: self.x, :, :] = img_2[: self.x, :, :]
-        self.img_rgb[self.x :, :, :] = img_1[self.x :, :, :]
-        self.img_rgb[self.x, :, :] = 10.0
-        self.x += 1
-
-        return self.img_rgb
-
-    @property
-    def done(self) -> bool:
-        return self.x >= self.w
+# requests is too verbose
+logging.getLogger("requests").setLevel(logging.WARN)
 
 
 @dataclass
 class Event:
+    """
+    Run the given callable at (or after) the specified time.
+    """
+
     time: datetime.time
     func: Callable[[datetime.time], None]
 
@@ -73,6 +55,12 @@ class Event:
         return self.time >= event.time
 
 
+def peek(pq: queue.PriorityQueue) -> Event:
+    temp = pq.get()
+    pq.put(temp)
+    return temp
+
+
 class MainLoop:
     """
     Handles transitioning between animations and telling the current animation to handle the button presses.
@@ -82,6 +70,9 @@ class MainLoop:
     NIGHTTIME = datetime.time(22, 0)
 
     ANIM_PERIOD = datetime.timedelta(seconds=45)
+
+    # Given ANIM_PERIOD of 45 sec expect no more than O(2000) in a 24 hour period
+    MAX_EVENTS = 10_000
 
     def __init__(self, brightness: float, flip: bool):
 
@@ -124,57 +115,54 @@ class MainLoop:
         # set up next transition
         self.events = queue.PriorityQueue()
 
+        # start schedule from previous event to ensure current state is correct
         now = datetime.datetime.now()
+        self.schedule(get_prev_time_of_day(now, self.DAYTIME), self.schedule_day)
 
-        if self.is_daytime(now):
-            if time := self.incr_time(now, self.ANIM_PERIOD):
-                self.schedule(
-                    time,
-                    lambda time: self.cycle_anim(time),
-                )
+    def schedule_day(self, time: datetime.datetime):
 
-        def _on_daytime(time: datetime.datetime):
-            self.cycle_anim(time)
+        # schedule all animation transitions for today
+        count = 0
+        time_ = time
+        while time_ := self.incr_time(time_, self.ANIM_PERIOD):
+            self.schedule(time_, lambda _: self.cycle_anim)
+            count += 1
 
-            # initially increase brightness a bit, then fully later, then decrease again
-            self.screen.set_brightness(0.1)
+        log.info(f"Scheduled {count:,d} transitions for {time.date():%F}.")
+
+        # just show time at night
+        self.schedule(
+            get_next_time_of_day(time, self.NIGHTTIME), lambda _: self.set_anim("time")
+        )
+
+        # schedule brightness transitions
+        self.screen.set_brightness(0.05)
+        for t, b in [
+            (datetime.time(9, 0), 0.10),
+            (datetime.time(9, 30), 0.15),
+            (datetime.time(10, 0), 0.20),
+            (datetime.time(21, 0), 0.15),
+            (datetime.time(21, 30), 0.10),
+            (datetime.time(23, 30), 0.05),
+        ]:
             self.schedule(
-                get_next_time_of_day(time, datetime.time(9, 0)),
-                lambda _t: self.screen.set_brightness(0.3),
+                get_next_time_of_day(time, t),
+                lambda _t: self.screen.set_brightness(b),
             )
 
-            self.schedule(
-                get_next_time_of_day(time, datetime.time(21, 0)),
-                lambda _t: self.screen.set_brightness(0.2),
-            )
-
-            # schedule tomorrow's daytime
-            self.schedule(get_next_time_of_day(time, self.NIGHTTIME), _on_nighttime)
-
-        def _on_nighttime(time: datetime.datetime):
-            self.cycle_anim(time, "time")
-
-            # initially decrease brightness a bit, then fully later.
-            self.screen.set_brightness(0.1)
-            self.schedule(
-                get_next_time_of_day(time, datetime.time(23, 0)),
-                lambda _t: self.screen.set_brightness(0.05),
-            )
-
-            # schedule tomorrow's nighttime
-            self.schedule(get_next_time_of_day(time, self.NIGHTTIME), _on_nighttime)
-
-        # we also schedule for prev day-/nighttime so that we cycle through and get the right brightness for right now
-        self.schedule(get_prev_time_of_day(now, self.DAYTIME), _on_daytime)
-        self.schedule(get_prev_time_of_day(now, self.NIGHTTIME), _on_nighttime)
-        self.schedule(get_next_time_of_day(now, self.DAYTIME), _on_daytime)
-        self.schedule(get_next_time_of_day(now, self.NIGHTTIME), _on_nighttime)
+        # schedule tomorrow
+        time_ = get_next_time_of_day(time, self.DAYTIME)
+        self.schedule(time_, self.schedule_day)
+        log.info(f"Will schedule tomorrow at {time_:%F %H:%M:%S}.")
 
     def schedule(
         self, time: datetime.datetime, func: Callable[[datetime.datetime], None]
     ):
         log.debug(f"Scheduling event at {time:%F %H:%M:%S}")
         self.events.put(Event(time, func))
+
+        if self.events.qsize() > self.MAX_EVENTS:
+            raise ValueError(f"Too many scheduled events!")
 
     def is_daytime(self, time: datetime.datetime) -> bool:
         return is_daytime(time, self.DAYTIME, self.NIGHTTIME)
@@ -201,28 +189,21 @@ class MainLoop:
     def curr_anim(self) -> Animation:
         return self.anims[self.anim_keys[self.anim_idx]]
 
-    def cycle_anim(self, time: datetime.datetime, anim: Union[str, None] = None):
-        if anim is None:
-            self.anim_idx = (self.anim_idx + 1) % len(self.anim_keys)
-        else:
-            self.anim_idx = self.anim_keys.index(anim)
+    def cycle_anim(self):
+        self.anim_idx = (self.anim_idx + 1) % len(self.anim_keys)
 
-        if self.is_daytime(time) and (time_ := self.incr_time(time, self.ANIM_PERIOD)):
-            self.schedule(time_, self.cycle_anim)
-
-        log.debug(f"Set anim to {self.anim_keys[self.anim_idx]!r}")
+    def set_anim(self, anim_name: str):
+        self.anim_idx = self.anim_keys.index(anim_name)
+        assert self.anim_idx > 0, f"Unknown anim_name! [{anim_name!r}]"
 
     def step(self, time: datetime.datetime):
 
         while self.events:
-            event = self.events.get()
-
-            if event.time > time:
+            if peek(self.events).time > time:
                 # we've processed all events <= time
-                self.events.put(event)
                 break
             else:
-                event.func(time)
+                self.events.get().func(time)
 
         img_rgb = self.curr_anim.step(time)
         self.screen.set_all_rgb(img_rgb)
@@ -240,8 +221,9 @@ class MainLoop:
 
 
 if __name__ == "__main__":
+
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.getLevelName(os.environ.pop("LOG_LEVEL", logging.INFO)),
         format="{asctime} - [{module}] {levelname} - {message}",
         style=r"{",
     )
