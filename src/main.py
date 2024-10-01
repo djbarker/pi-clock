@@ -55,10 +55,13 @@ class Event:
         return self.time >= event.time
 
 
-def peek(pq: queue.PriorityQueue) -> Event:
-    temp = pq.get()
-    pq.put(temp)
-    return temp
+def peek(pq: queue.PriorityQueue) -> Union[Event, None]:
+    if pq.qsize() > 0:
+        temp = pq.get()
+        pq.put(temp)
+        return temp
+    else:
+        return None
 
 
 class MainLoop:
@@ -117,23 +120,25 @@ class MainLoop:
 
         # start schedule from previous event to ensure current state is correct
         now = datetime.datetime.now()
-        self.schedule(get_prev_time_of_day(now, self.DAYTIME), self.schedule_day)
+        self.schedule_day(get_prev_time_of_day(now, self.DAYTIME))
 
     def schedule_day(self, time: datetime.datetime):
 
         # schedule all animation transitions for today
         count = 0
-        time_ = time
+        now = datetime.datetime.now()
+        time_ = get_prev_time_of_day(time, self.DAYTIME)
         while time_ := self.incr_time(time_, self.ANIM_PERIOD):
-            self.schedule(time_, lambda _: self.cycle_anim)
-            count += 1
+            # Since we don't really care exactly where in the cycle we start, avoid needlessly scheduling events that are actually in the past.
+            if time_ >= now:
+                self.schedule(time_, lambda _: self.cycle_anim())
+                count += 1
 
         log.info(f"Scheduled {count:,d} transitions for {time.date():%F}.")
 
         # just show time at night
-        self.schedule(
-            get_next_time_of_day(time, self.NIGHTTIME), lambda _: self.set_anim("time")
-        )
+        nighttime = get_next_time_of_day(time, self.NIGHTTIME)
+        self.schedule(nighttime, lambda _: self.set_anim("time"))
 
         # schedule brightness transitions
         self.screen.set_brightness(0.05)
@@ -155,9 +160,7 @@ class MainLoop:
         self.schedule(time_, self.schedule_day)
         log.info(f"Will schedule tomorrow at {time_:%F %H:%M:%S}.")
 
-    def schedule(
-        self, time: datetime.datetime, func: Callable[[datetime.datetime], None]
-    ):
+    def schedule(self, time: datetime.datetime, func: Callable[[datetime.datetime], None]):
         log.debug(f"Scheduling event at {time:%F %H:%M:%S}")
         self.events.put(Event(time, func))
 
@@ -194,16 +197,18 @@ class MainLoop:
 
     def set_anim(self, anim_name: str):
         self.anim_idx = self.anim_keys.index(anim_name)
-        assert self.anim_idx > 0, f"Unknown anim_name! [{anim_name!r}]"
+        assert self.anim_idx >= 0, f"Unknown anim_name! [{anim_name!r}]"
 
     def step(self, time: datetime.datetime):
 
         while self.events:
-            if peek(self.events).time > time:
+            if (e := peek(self.events)) and (e.time > time):
                 # we've processed all events <= time
                 break
-            else:
-                self.events.get().func(time)
+
+            event = self.events.get()
+            event.func(time)
+            log.debug(f"Ran event scheduled for {event.time:%F %H:%M:%S} at {time:%F %H:%M:%S}")
 
         img_rgb = self.curr_anim.step(time)
         self.screen.set_all_rgb(img_rgb)
@@ -224,7 +229,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(
         level=logging.getLevelName(os.environ.pop("LOG_LEVEL", logging.INFO)),
-        format="{asctime} - [{module}] {levelname} - {message}",
+        format="{asctime} - {levelname:5.5s} [{module}] - {message}",
         style=r"{",
     )
 
