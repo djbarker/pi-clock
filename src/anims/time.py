@@ -56,6 +56,7 @@ def get_next_time_of_day(
         return datetime.datetime.combine(tomorrow, time_of_day)
 
 
+# better name would be floor_time_of_day because if we are at time_of_day we return that
 def get_prev_time_of_day(
     timestamp: datetime.datetime, time_of_day: datetime.time
 ) -> datetime.date:
