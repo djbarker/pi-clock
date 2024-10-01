@@ -3,9 +3,14 @@ import logging
 
 from abc import ABC, abstractmethod
 from colorsys import hsv_to_rgb
-from gpiozero import Button
-from unicornhatmini import UnicornHATMini
+from PIL import ImageDraw, Image
 from typing import Callable, Literal
+
+# Raspberry Pi libs
+from gpiozero import Button
+from displayhatmini import DisplayHATMini
+from unicornhatmini import UnicornHATMini
+
 
 from utils import cmyk_to_rgb
 
@@ -117,3 +122,47 @@ class UnicornHATMini(Screen):
 
     def set_button_handler(self, button: ButtonT, func: Callable[[], None]):
         self.buttons[button].when_pressed = func
+
+
+class DisplayHatMini(Screen):
+    """
+    See: https://github.com/pimoroni/displayhatmini-python
+    """
+
+    def __init__(self, brightness: float = 0.25, flip: bool = False) -> None:
+
+        width = DisplayHATMini.WIDTH
+        height = DisplayHATMini.HEIGHT
+        buffer = Image.new("RGB", (width, height))
+        draw = ImageDraw.Draw(buffer)
+
+        self.buff = buffer
+        self.draw = draw
+        self.flip = flip
+        self.disp = DisplayHATMini(self.buff)
+
+        self.disp.set_led(0.05, 0.05, 0.05)
+
+    def set_brightness(self, brightness: float):
+        log.debug(f"Screen brightness set to {brightness:.2f}")
+        brightness = min(max(brightness, 0.02), 1.0)
+        self.disp.set_led(brightness, brightness, brightness)
+
+    def clear(self):
+        self.disp.clear()
+
+    def show(self):
+        self.disp.display()
+
+    def set_pixel_rgb(self, x: int, y: int, r: int, g: int, b: int):
+        r = min(max(int(r), 0), 255)
+        g = min(max(int(g), 0), 255)
+        b = min(max(int(b), 0), 255)
+        if self.flip:
+            y = self.height - y - 1
+            x = self.width - x - 1
+        self.uh.set_pixel(x, y, r, g, b)
+
+    def set_button_handler(self, button: ButtonT, func: Callable[[], None]):
+        # TODO: this
+        pass
