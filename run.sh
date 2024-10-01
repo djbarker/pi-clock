@@ -21,5 +21,5 @@ sleep 5
 nohup python src/main.py -b 0.05 -f &
 
 # print pid
-echo $! > run.pid
+echo $! > .pid
 echo "$(date) ... $!"
