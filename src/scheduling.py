@@ -14,7 +14,7 @@ from typing import Callable, Union, Literal
 from PIL import Image, ImageDraw, ImageFont
 from signal import pause
 
-from screen import Screen, UnicornHATMini
+from screen import Screen, DisplayHatMini, UnicornHatMini
 from anims import Animation
 from anims.time import TimeAnim, is_daytime, get_prev_time_of_day, get_next_time_of_day
 from anims.splat import ChangingSplatAnim
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     # main loop
 
     log.info("Initializing")
-    screen = UnicornHATMini(args.brightness, args.flip)
+    screen = DisplayHatMini(args.brightness, args.flip)
     loop = MainLoop(screen)
 
     try:

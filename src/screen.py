@@ -8,14 +8,14 @@ from typing import Callable, Literal
 
 # Raspberry Pi libs
 from gpiozero import Button
-from displayhatmini import DisplayHATMini
-from unicornhatmini import UnicornHATMini
+from displayhatmini import DisplayHATMini as _DisplayHATMini
+from unicornhatmini import UnicornHATMini as _UnicornHATMini
 
 
 from utils import cmyk_to_rgb
 
 
-__all__ = ["Screen", "UnicornHATMini"]
+__all__ = ["Screen", "UnicornHatMini"]
 
 log = logging.getLogger(__name__)
 
@@ -79,10 +79,13 @@ class Screen(ABC):
                 self.set_pixel_rgb(x, y, r, g, b)
 
 
-class UnicornHATMini(Screen):
+class UnicornHatMini(Screen):
+    """
+    See: https://github.com/pimoroni/unicornhatmini-python
+    """
 
     def __init__(self, brightness: float = 0.25, flip: bool = False):
-        self.uh = UnicornHATMini()
+        self.uh = _UnicornHATMini()
 
         # TODO: what does this do? Can I remove flip
         rotation = 0
@@ -131,15 +134,15 @@ class DisplayHatMini(Screen):
 
     def __init__(self, brightness: float = 0.25, flip: bool = False) -> None:
 
-        width = DisplayHATMini.WIDTH
-        height = DisplayHATMini.HEIGHT
+        width = _DisplayHATMini.WIDTH
+        height = _DisplayHATMini.HEIGHT
         buffer = Image.new("RGB", (width, height))
         draw = ImageDraw.Draw(buffer)
 
         self.buff = buffer
         self.draw = draw
         self.flip = flip
-        self.disp = DisplayHATMini(self.buff)
+        self.disp = _DisplayHATMini(self.buff)
 
         self.disp.set_led(0.05, 0.05, 0.05)
 
@@ -155,13 +158,13 @@ class DisplayHatMini(Screen):
         self.disp.display()
 
     def set_pixel_rgb(self, x: int, y: int, r: int, g: int, b: int):
-        r = min(max(int(r), 0), 255)
-        g = min(max(int(g), 0), 255)
-        b = min(max(int(b), 0), 255)
+        r = min(max(int(r), 0), 255) / 255.0
+        g = min(max(int(g), 0), 255) / 255.0
+        b = min(max(int(b), 0), 255) / 255.0
         if self.flip:
             y = self.height - y - 1
             x = self.width - x - 1
-        self.uh.set_pixel(x, y, r, g, b)
+        self.buff.putpixel((x, y), (r, g, b))
 
     def set_button_handler(self, button: ButtonT, func: Callable[[], None]):
         # TODO: this
