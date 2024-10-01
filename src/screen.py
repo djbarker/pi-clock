@@ -139,6 +139,8 @@ class DisplayHatMini(Screen):
         buffer = Image.new("RGB", (width, height))
         draw = ImageDraw.Draw(buffer)
 
+        self.width = width
+        self.height = height
         self.buff = buffer
         self.draw = draw
         self.flip = flip
