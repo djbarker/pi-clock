@@ -1,0 +1,7 @@
+displayhatmini 
+unicornhatmini
+gpiozero
+pillow
+numpy
+scipy
+requests
