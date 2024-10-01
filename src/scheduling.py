@@ -12,10 +12,9 @@ from dataclasses import dataclass
 from typing import Callable, Union, Literal
 
 from PIL import Image, ImageDraw, ImageFont
-from gpiozero import Button
 from signal import pause
 
-from screen import Screen
+from screen import Screen, UnicornHATMini
 from anims import Animation
 from anims.time import TimeAnim, is_daytime, get_prev_time_of_day, get_next_time_of_day
 from anims.splat import ChangingSplatAnim
@@ -77,15 +76,11 @@ class MainLoop:
     # Given ANIM_PERIOD of 45 sec expect no more than O(2000) in a 24 hour period
     MAX_EVENTS = 10_000
 
-    def __init__(self, brightness: float, flip: bool):
+    def __init__(self, screen: Screen):
 
         # setup screen & buttons
 
-        self.screen = Screen(brightness=brightness, flip=flip)
-        self.button_a = Button(5)
-        self.button_b = Button(6)
-        self.button_x = Button(16)
-        self.button_y = Button(24)
+        self.screen = screen
 
         def brightness_change(incr: float):
             def _impl():
@@ -96,11 +91,10 @@ class MainLoop:
 
             return _impl
 
-        self.button_a.when_pressed = brightness_change(0.05)
-        self.button_b.when_pressed = brightness_change(-0.05)
-
-        self.button_x.when_pressed = self.handle_X
-        self.button_y.when_pressed = self.handle_Y
+        self.screen.set_button_handler("a", brightness_change(0.05))
+        self.screen.set_button_handler("b", brightness_change(-0.05))
+        self.screen.set_button_handler("x", self.handle_X)
+        self.screen.set_button_handler("y", self.handle_Y)
 
         # set up the animations
 
@@ -241,7 +235,8 @@ if __name__ == "__main__":
     # main loop
 
     log.info("Initializing")
-    loop = MainLoop(args.brightness, args.flip)
+    screen = UnicornHATMini(args.brightness, args.flip)
+    loop = MainLoop(screen)
 
     try:
         start_t = datetime.datetime.now()
