@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 
 from colorsys import hsv_to_rgb
 from unicornhatmini import UnicornHATMini
@@ -7,6 +8,8 @@ from utils import cmyk_to_rgb
 
 
 __all__ = ["Screen"]
+
+log = logging.getLogger(__name__)
 
 
 class Screen:
@@ -24,6 +27,7 @@ class Screen:
         self.flip = flip
 
     def set_brightness(self, brightness: float):
+        log.debug(f"Screen brightness set to {brightness:.2f}")
         brightness = min(max(brightness, 0.02), 1.0)
         self.uh.set_brightness(brightness)
 
