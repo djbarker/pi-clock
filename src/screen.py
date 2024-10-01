@@ -144,12 +144,12 @@ class DisplayHatMini(Screen):
         self.flip = flip
         self.disp = _DisplayHATMini(self.buff)
 
-        self.disp.set_led(0.05, 0.05, 0.05)
+        self.disp.set_led(0.05, 0.00, 0.00)
 
     def set_brightness(self, brightness: float):
         log.debug(f"Screen brightness set to {brightness:.2f}")
         brightness = min(max(brightness, 0.02), 1.0)
-        self.disp.set_led(brightness, brightness, brightness)
+        # self.disp.set_led(brightness, brightness, brightness)
 
     def clear(self):
         self.disp.clear()
